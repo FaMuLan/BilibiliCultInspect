@@ -1,4 +1,5 @@
 from time import sleep
+from urllib.request import urlopen
 import threading
 import websocket
 import zlib
@@ -10,10 +11,31 @@ ws_client.connect("ws://broadcastlv.chat.bilibili.com:2244/sub")
 is_quit = False
 
 enter_pack_post = json.dumps({"roomid": 174142, "clientver": "1.5.10.1", "type": 2, "platform": "web"})
+#差点忘了声明：这个房间号我随便找的，只要不是太过于热门的直播间就行，之后再改成可以在配置文件改的那种.jpg
 enter_pack_header = (len(enter_pack_post) + 16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (7).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
 enter_pack = enter_pack_header + enter_pack_post.encode("utf-8")
 ws_client.send(enter_pack)
 enter_recv_pack = ws_client.recv()
+
+def inspect_user(uid):
+	follow = []
+	page = 1;
+	while True:
+		url = urlopen("https://api.bilibili.com/x/relation/followings?vmid={0}&pn={1}".format(uid, page))
+		follow_text = url.read()
+		follow_json = json.loads(follow_text)
+		if follow_json["code"] == 0:
+			total_follow = follow_json["data"]["total"]
+			for i in follow_json["data"]["list"]:
+				follow.append(i["mid"])
+			if page * 50 >= total_follow:
+				break
+			page += 1
+		else:
+			break
+	return follow
+
+
 
 def send_heartbeat_pack():
 	while not is_quit:
@@ -43,8 +65,8 @@ def receive_pack():
 
 	def split_pack(pack):
 		pack_size = int.from_bytes(pack[:4], "big")
-		pack_total = [pack[0:pack_size]]
-		if len(pack[pack_size:]) > 0:
+		pack_total = [pack[:pack_size]]
+		if len(pack) > pack_size:
 			pack_second = pack[pack_size:]
 			pack_total += split_pack(pack_second)
 		return pack_total
@@ -60,7 +82,7 @@ def receive_pack():
 				recv = json.loads(recv_text[0])
 				if recv["cmd"] == "INTERACT_WORD":
 					print("uid: ", recv["data"]["uid"], "name: ", recv["data"]["uname"])
-
+					follow = inspect_user(recv["data"]["uid"])
 
 t1 = threading.Thread(target = send_heartbeat_pack)
 t2 = threading.Thread(target = receive_pack)
