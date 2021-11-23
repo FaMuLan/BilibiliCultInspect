@@ -43,34 +43,34 @@ def send_heartbeat_pack():
 		ws_client.send(heartbeat_pack_header)
 		sleep(30)
 
+
+def get_text(pack):
+	operation = int.from_bytes(pack[8:12], "big")
+	if operation == 5:
+		return pack[16:].decode("UTF-8")
+	return None
+
+def split_pack(pack):
+	pack_size = int.from_bytes(pack[:4], "big")
+	pack_total = []
+	protocol_version = int.from_bytes(pack[6:8], "big")
+	if protocol_version == 2:
+		pack_child = zlib.decompress(pack[16:])
+		pack_total += split_pack(pack_child)
+	elif protocol_version == 3:
+		pack_child = brotli.decompress(pack[16:])
+		pack_total += split_pack(pack_child)
+	#一个数据包套多个小数据包的情况
+	elif len(pack) > pack_size:
+		pack_child = pack[pack_size:]
+		pack_total.append(pack)
+		pack_total += split_pack(pack_child)
+	#多个数据包的情况
+	else:
+		pack_total.append(pack)
+	return pack_total
+
 def receive_pack():
-	def get_text(pack):
-		pack_header = pack[:16]
-		pack_get = pack[16:]
-		operation = int.from_bytes(pack_header[8:12], "big")
-		protocol_version = int.from_bytes(pack_header[6:8], "big")
-		if protocol_version == 0:
-			if operation == 5:
-				return pack_get.decode("UTF-8")
-			return None
-		elif protocol_version == 2:
-			child_pack = zlib.decompress(pack_get)
-			return get_text(child_pack)
-			#需要用zlib解压出数据包，再把那个数据包按照协议版本解压一遍，需要另外写个函数并递归（搁这套娃干什么在那难怪我手机用这玩意儿这么卡）
-		elif protocol_version == 3:
-			child_pack = brotli.decompress(pack_get)
-			return get_text(child_pack)
-			#没有遇到或者感知不到这种情况，先闲置不管
-		return None
-
-	def split_pack(pack):
-		pack_size = int.from_bytes(pack[:4], "big")
-		pack_total = [pack[:pack_size]]
-		if len(pack) > pack_size:
-			pack_second = pack[pack_size:]
-			pack_total += split_pack(pack_second)
-		return pack_total
-
 	while not is_quit:
 		recv_pack = ws_client.recv()
 		recv_pack = split_pack(recv_pack)
