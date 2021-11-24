@@ -5,6 +5,7 @@ import websocket
 import zlib
 import brotli
 import json
+import sqlite3
 
 setting_file = open("setting.json", mode="r", encoding="UTF-8")
 setting_json = json.loads(setting_file.read())
@@ -12,12 +13,6 @@ setting_json = json.loads(setting_file.read())
 ws_client = websocket.WebSocket()
 ws_client.connect("ws://broadcastlv.chat.bilibili.com:2244/sub")
 is_quit = False
-
-enter_pack_post = json.dumps({"roomid": setting_json["roomid"], "clientver": "1.5.10.1", "type": 2, "platform": "web"})
-enter_pack_header = (len(enter_pack_post) + 16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (7).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
-enter_pack = enter_pack_header + enter_pack_post.encode("utf-8")
-ws_client.send(enter_pack)
-enter_recv_pack = ws_client.recv()
 
 def inspect_user(uid):
 	follow = []
@@ -37,7 +32,12 @@ def inspect_user(uid):
 			break
 	return follow
 
-
+def send_enter_pack():
+	enter_pack_post = json.dumps({"roomid": setting_json["roomid"], "clientver": "1.5.10.1", "type": 2, "platform": "web"})
+	enter_pack_header = (len(enter_pack_post) + 16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (7).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
+	enter_pack = enter_pack_header + enter_pack_post.encode("utf-8")
+	ws_client.send(enter_pack)
+	enter_recv_pack = ws_client.recv()
 
 def send_heartbeat_pack():
 	while not is_quit:
@@ -69,6 +69,8 @@ def split_pack(pack):
 	return pack_total
 
 def receive_pack():
+	database = sqlite3.connect("flagged.db")
+	cursor = database.cursor()
 	while not is_quit:
 		recv_pack = ws_client.recv()
 		recv_pack = split_pack(recv_pack)
@@ -78,12 +80,24 @@ def receive_pack():
 				recv = json.loads(recv_text)
 				if recv["cmd"] == "INTERACT_WORD":
 					print("uid: ", recv["data"]["uid"], "name: ", recv["data"]["uname"])
-					follow = inspect_user(recv["data"]["uid"])
-					for i in setting_json["inspect_following"]:
-						if follow.count(i["uid"]):
-							print(i["notification"])
+					cursor.execute("select uname from user where uid = {0}".format(recv["data"]["uid"]))
+					if not cursor.fetchone():
+						follow = inspect_user(recv["data"]["uid"])
+						for i in setting_json["inspect_following"]:
+							if follow.count(i["uid"]):
+								print(i["notification"])
+								cursor.execute("insert into user (uid, uname) values({0}, '{1}')".format(recv["data"]["uid"], recv["data"]["uname"]))
+								cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
+								database.commit()
+					else:
+						cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
+						database.commit()
 
+				#想办法标记用户
+				if recv["cmd"] == "DANMU_MSG":
+					pass	#TODO:按照委托要求，我需要连带标记用户的发言也一并记录下来，不一定能当作证据，但可以让被标记用户崩防.jpg
 
+send_enter_pack()
 t1 = threading.Thread(target = send_heartbeat_pack)
 t2 = threading.Thread(target = receive_pack)
 t1.setDaemon(True)
