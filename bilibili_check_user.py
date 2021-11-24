@@ -92,10 +92,14 @@ def receive_pack():
 					else:
 						cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
 						database.commit()
-
 				#想办法标记用户
 				if recv["cmd"] == "DANMU_MSG":
-					pass	#TODO:按照委托要求，我需要连带标记用户的发言也一并记录下来，不一定能当作证据，但可以让被标记用户崩防.jpg
+					cursor.execute("select uname from user where uid = {0}".format(recv["info"][2][0]))
+					if cursor.fetchone():
+						print("{0}: {1}".format(recv["info"][2][1], recv["info"][1]))
+						cursor.execute("insert into message (time, text, uid) values({0}, '{1}', {2})".format(recv["info"][0][3], recv["info"][1], recv["info"][2][0]))
+						database.commit()
+				#按照委托要求，我需要连带标记用户的发言也一并记录下来，不一定能当作证据，但可以让被标记用户崩防.jpg
 
 send_enter_pack()
 t1 = threading.Thread(target = send_heartbeat_pack)
