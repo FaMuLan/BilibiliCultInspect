@@ -10,8 +10,7 @@ import sqlite3
 setting_file = open("setting.json", mode="r", encoding="UTF-8")
 setting_json = json.loads(setting_file.read())
 #用户配置文件设置
-ws_client = websocket.WebSocket()
-ws_client.connect("ws://broadcastlv.chat.bilibili.com:2244/sub")
+ws_client = websocket.create_connection("ws://broadcastlv.chat.bilibili.com:2244/sub")
 is_quit = False
 
 def inspect_user(uid):
