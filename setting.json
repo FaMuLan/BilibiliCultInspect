@@ -1,9 +1,21 @@
 {
-	"roomid": 174142,
+	"roomid": 1708320,
 	"inspect_following": [
 		{
 			"uid": 401742377,
 			"notification": "〇批"
+		},
+		{
+			"uid": 672328094,
+			"notification": "嘉批"
+		},
+		{
+			"uid": 57863910,
+			"notification": "农批"
+		},
+		{
+			"uid": 161775300,
+			"notification": "舟批"
 		},
 		{
 			"uid": 30105172,
