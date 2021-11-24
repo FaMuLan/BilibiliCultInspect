@@ -55,16 +55,13 @@ def split_pack(pack):
 	pack_total = []
 	protocol_version = int.from_bytes(pack[6:8], "big")
 	if protocol_version == 2:
-		pack_child = zlib.decompress(pack[16:])
-		pack_total += split_pack(pack_child)
+		pack_total += split_pack(zlib.decompress(pack[16:]))
 	elif protocol_version == 3:
-		pack_child = brotli.decompress(pack[16:])
-		pack_total += split_pack(pack_child)
+		pack_total += split_pack(brotli.decompress(pack[16:]))
 	#一个数据包套多个小数据包的情况
 	elif len(pack) > pack_size:
-		pack_child = pack[pack_size:]
-		pack_total.append(pack)
-		pack_total += split_pack(pack_child)
+		pack_total.append(pack[:pack_size])
+		pack_total += split_pack(pack[pack_size:])
 	#多个数据包的情况
 	else:
 		pack_total.append(pack)
@@ -77,9 +74,7 @@ def receive_pack():
 		for i in recv_pack:
 			recv_text = get_text(i)
 			if recv_text:
-				recv_text = recv_text.split(">")	#临时方案，要是把完整的JSON一分为二了就再改.jpg
-				#TODO: 这脑瘫B站有的时候会在一个数据包里面塞两段JSON过来，需要进行切割再进行解析
-				recv = json.loads(recv_text[0])
+				recv = json.loads(recv_text)
 				if recv["cmd"] == "INTERACT_WORD":
 					print("uid: ", recv["data"]["uid"], "name: ", recv["data"]["uname"])
 					follow = inspect_user(recv["data"]["uid"])
