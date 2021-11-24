@@ -1,7 +1,7 @@
 from time import sleep
+import socket
 from urllib.request import urlopen
 import threading
-import websocket
 import zlib
 import brotli
 import json
@@ -10,8 +10,8 @@ import sqlite3
 setting_file = open("setting.json", mode="r", encoding="UTF-8")
 setting_json = json.loads(setting_file.read())
 #用户配置文件设置
-ws_client = websocket.WebSocket()
-ws_client.connect("ws://broadcastlv.chat.bilibili.com:2244/sub")
+tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+tcp_client.connect(("broadcastlv.chat.bilibili.com", 2243))
 is_quit = False
 
 def inspect_user(uid):
@@ -36,13 +36,13 @@ def send_enter_pack():
 	enter_pack_post = json.dumps({"roomid": setting_json["roomid"], "clientver": "1.5.10.1", "type": 2, "platform": "web"})
 	enter_pack_header = (len(enter_pack_post) + 16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (7).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
 	enter_pack = enter_pack_header + enter_pack_post.encode("utf-8")
-	ws_client.send(enter_pack)
-	enter_recv_pack = ws_client.recv()
+	tcp_client.send(enter_pack)
+	enter_recv_pack = tcp_client.recv(2048)
 
 def send_heartbeat_pack():
 	while not is_quit:
 		heartbeat_pack_header = (16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (2).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
-		ws_client.send(heartbeat_pack_header)
+		tcp_client.send(heartbeat_pack_header)
 		sleep(30)
 
 def get_text(pack):
@@ -72,7 +72,7 @@ def receive_pack():
 	database = sqlite3.connect("flagged.db")
 	cursor = database.cursor()
 	while not is_quit:
-		recv_pack = ws_client.recv()
+		recv_pack = tcp_client.recv(2048)
 		recv_pack = split_pack(recv_pack)
 		for i in recv_pack:
 			recv_text = get_text(i)
@@ -110,4 +110,4 @@ t1.start()
 t2.start()
 temp = input()	#按一下回车就退出
 is_quit = True
-ws_client.close()
+tcp_client.close()
