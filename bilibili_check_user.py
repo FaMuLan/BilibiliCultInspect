@@ -6,12 +6,14 @@ import zlib
 import brotli
 import json
 
+setting_file = open("setting.json", mode="r", encoding="UTF-8")
+setting_json = json.loads(setting_file.read())
+#用户配置文件设置
 ws_client = websocket.WebSocket()
 ws_client.connect("ws://broadcastlv.chat.bilibili.com:2244/sub")
 is_quit = False
 
-enter_pack_post = json.dumps({"roomid": 174142, "clientver": "1.5.10.1", "type": 2, "platform": "web"})
-#差点忘了声明：这个房间号我随便找的，只要不是太过于热门的直播间就行，之后再改成可以在配置文件改的那种.jpg
+enter_pack_post = json.dumps({"roomid": setting_json["roomid"], "clientver": "1.5.10.1", "type": 2, "platform": "web"})
 enter_pack_header = (len(enter_pack_post) + 16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (7).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
 enter_pack = enter_pack_header + enter_pack_post.encode("utf-8")
 ws_client.send(enter_pack)
@@ -21,8 +23,8 @@ def inspect_user(uid):
 	follow = []
 	page = 1;
 	while True:
-		url = urlopen("https://api.bilibili.com/x/relation/followings?vmid={0}&pn={1}".format(uid, page))
-		follow_text = url.read()
+		follow_url = urlopen("https://api.bilibili.com/x/relation/followings?vmid={0}&pn={1}".format(uid, page))
+		follow_text = follow_url.read()
 		follow_json = json.loads(follow_text)
 		if follow_json["code"] == 0:
 			total_follow = follow_json["data"]["total"]
@@ -42,7 +44,6 @@ def send_heartbeat_pack():
 		heartbeat_pack_header = (16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (2).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
 		ws_client.send(heartbeat_pack_header)
 		sleep(30)
-
 
 def get_text(pack):
 	operation = int.from_bytes(pack[8:12], "big")
@@ -78,6 +79,10 @@ def receive_pack():
 				if recv["cmd"] == "INTERACT_WORD":
 					print("uid: ", recv["data"]["uid"], "name: ", recv["data"]["uname"])
 					follow = inspect_user(recv["data"]["uid"])
+					for i in setting_json["inspect_following"]:
+						if follow.count(i["uid"]):
+							print(i["notification"])
+
 
 t1 = threading.Thread(target = send_heartbeat_pack)
 t2 = threading.Thread(target = receive_pack)
