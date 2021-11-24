@@ -13,7 +13,7 @@ setting_json = json.loads(setting_file.read())
 ws_client = websocket.create_connection("ws://broadcastlv.chat.bilibili.com:2244/sub")
 is_quit = False
 
-def inspect_user(uid):
+def inspect_user_following(uid):
 	follow = []
 	page = 1;
 	while True:
@@ -30,6 +30,13 @@ def inspect_user(uid):
 		else:
 			break
 	return follow
+
+def inspect_user_rank(uid):
+	user_info_url = urlopen("https://api.bilibili.com/x/space/acc/info?mid={0}".format(uid))
+	user_info_text = user_info_url.read()
+	user_info_json = json.loads(user_info_text)
+	rank = user_info_json["data"]["level"]
+	return rank
 
 def send_enter_pack():
 	enter_pack_post = json.dumps({"roomid": setting_json["roomid"], "clientver": "1.5.10.1", "type": 2, "platform": "web"})
@@ -78,28 +85,38 @@ def receive_pack():
 			if recv_text:
 				recv = json.loads(recv_text)
 				if recv["cmd"] == "INTERACT_WORD":
-					print("uid: ", recv["data"]["uid"], "name: ", recv["data"]["uname"])
-					cursor.execute("select uname from user where uid = {0}".format(recv["data"]["uid"]))
+					uid = recv["data"]["uid"]
+					uname = recv["data"]["uname"]
+					time = recv["data"]["timestamp"]
+					print("uid: ", uid, "name: ", uname)
+					cursor.execute("select uname from user where uid = {0}".format(uid))
+					#查询是否为已标记用户
 					if not cursor.fetchone():
-						follow = inspect_user(recv["data"]["uid"])
+						follow = inspect_user_following(uid)
 						flagged = False
 						for i in setting_json["inspect_following"]:
 							if follow.count(i["uid"]):
 								print(i["notification"])
 								flagged = True
 						if flagged:
-							cursor.execute("insert into user(uid, uname) values({0}, '{1}')".format(recv["data"]["uid"], recv["data"]["uname"]))
-							cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
+							rank = inspect_user_rank(uid)
+							cursor.execute("insert into user(uid, uname) values({0}, '{1}')".format(uid, uname))
+							cursor.execute("insert into enter(time, rank, uid) values({0}, {1}, {2})".format(time, rank, uid))
 							database.commit()
 					else:
-						cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
+						rank = inspect_user_rank(uid)
+						cursor.execute("insert into enter(time, rank, uid) values({0}, {1}, {2})".format(time, uid))
 						database.commit()
 				#想办法标记用户
 				if recv["cmd"] == "DANMU_MSG":
-					cursor.execute("select uname from user where uid = {0}".format(recv["info"][2][0]))
+					uid = recv["info"][2][0]
+					name = recv["info"][2][1]
+					time = recv["info"][0][3]
+					text = recv["info"][1]
+					cursor.execute("select uname from user where uid = {0}".format(uid))
 					if cursor.fetchone():
-						print("{0}: {1}".format(recv["info"][2][1], recv["info"][1]))
-						cursor.execute("insert into message (time, text, uid) values({0}, '{1}', {2})".format(recv["info"][0][3], recv["info"][1], recv["info"][2][0]))
+						print("{0}: {1}".format(name, text))
+						cursor.execute("insert into message (time, text, uid) values({0}, '{1}', {2})".format(time, text, uid))
 						database.commit()
 				#按照委托要求，我需要连带标记用户的发言也一并记录下来，不一定能当作证据，但可以让被标记用户崩防.jpg
 
