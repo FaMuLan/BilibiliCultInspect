@@ -82,12 +82,15 @@ def receive_pack():
 					cursor.execute("select uname from user where uid = {0}".format(recv["data"]["uid"]))
 					if not cursor.fetchone():
 						follow = inspect_user(recv["data"]["uid"])
+						flagged = False
 						for i in setting_json["inspect_following"]:
 							if follow.count(i["uid"]):
 								print(i["notification"])
-								cursor.execute("insert into user (uid, uname) values({0}, '{1}')".format(recv["data"]["uid"], recv["data"]["uname"]))
-								cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
-								database.commit()
+								flagged = True
+						if flagged:
+							cursor.execute("insert into user(uid, uname) values({0}, '{1}')".format(recv["data"]["uid"], recv["data"]["uname"]))
+							cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
+							database.commit()
 					else:
 						cursor.execute("insert into enter(time, uid) values({0}, {1})".format(recv["data"]["timestamp"], recv["data"]["uid"]))
 						database.commit()
