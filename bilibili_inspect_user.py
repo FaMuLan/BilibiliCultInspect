@@ -43,7 +43,6 @@ def send_enter_pack():
 	enter_pack_header = (len(enter_pack_post) + 16).to_bytes(4, byteorder="big") + (16).to_bytes(2, byteorder="big") + (0).to_bytes(2, byteorder="big") + (7).to_bytes(4, byteorder="big") + (1).to_bytes(4, byteorder="big")
 	enter_pack = enter_pack_header + enter_pack_post.encode("utf-8")
 	ws_client.send(enter_pack)
-	enter_recv_pack = ws_client.recv()
 
 def send_heartbeat_pack():
 	while not is_quit:
@@ -121,12 +120,15 @@ def receive_pack():
 				#按照委托要求，我需要连带标记用户的发言也一并记录下来，不一定能当作证据，但可以让被标记用户崩防.jpg
 
 send_enter_pack()
+#发个进房包
 t1 = threading.Thread(target = send_heartbeat_pack)
 t2 = threading.Thread(target = receive_pack)
 t1.setDaemon(True)
 t2.setDaemon(True)
+#TODO：考虑到更高版本的Python这个地方会出警告，需要重新评估多线程方案
 t1.start()
 t2.start()
+
 temp = input()	#按一下回车就退出
 is_quit = True
 ws_client.close()
