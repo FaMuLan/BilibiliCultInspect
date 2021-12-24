@@ -114,7 +114,7 @@ def receive_pack():
 								database.commit()
 						else:
 							rank = inspect_user_rank(uid)
-							cursor.execute("insert into enter(time, rank, uid) values({0}, {1}, {2})".format(timestamp, uid))
+							cursor.execute("insert into enter(time, rank, uid) values({0}, {1}, {2})".format(timestamp, rank, uid))
 							database.commit()
 					#想办法标记用户
 					if recv["cmd"] == "DANMU_MSG":
