@@ -1,11 +1,12 @@
 import time
+import argparse
 import websocket
 from urllib.request import urlopen
 import threading
 import zlib
 import brotli
 import json
-import sqlite3
+import sqlite3	
 
 setting_file = open("setting.json", mode="r", encoding="UTF-8")
 setting_json = json.loads(setting_file.read())
@@ -131,16 +132,31 @@ def receive_pack():
 			elif operation == 3:
 				heartbeat_timer = time.time()
 
-send_enter_pack()
-#发个进房包
-t1 = threading.Thread(target = send_heartbeat_pack)
-t2 = threading.Thread(target = receive_pack)
-t1.setDaemon(True)
-t2.setDaemon(True)
-#TODO：考虑到更高版本的Python这个地方会出警告，需要重新评估多线程方案
-t1.start()
-t2.start()
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--inspect", help="直接检查用户成分", type=int, nargs="+")
+args = parser.parse_args()
+if args.inspect:
+	danger = 0
+	for i in args.inspect:
+		print(i)
+		follow = inspect_user_following(i)
+		for i in setting_json["inspect_following"]:
+			if follow.count(i["uid"]):
+				danger += 1
+				print(i["notification"])
+		if not danger:
+			print("安全")
+else:
+	send_enter_pack()
+	#发个进房包
+	t1 = threading.Thread(target = send_heartbeat_pack)
+	t2 = threading.Thread(target = receive_pack)
+	t1.setDaemon(True)
+	t2.setDaemon(True)
+	#TODO：考虑到更高版本的Python这个地方会出警告，需要重新评估多线程方案
+	t1.start()
+	t2.start()
 
-temp = input()	#按一下回车就退出
-is_quit = True
-ws_client.close()
+	temp = input()	#按一下回车就退出
+	is_quit = True
+	ws_client.close()
