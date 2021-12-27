@@ -134,7 +134,13 @@ def receive_pack():
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--inspect", help="直接检查用户成分", type=int, nargs="+")
+parser.add_argument("-f", "--follow", help="需要关注的成分", nargs="+")
 args = parser.parse_args()
+
+if args.follow:
+	for i in range(int(len(args.follow) / 2)):
+		setting_json["inspect_following"].append({"uid": int(args.follow[2 * i]), "notification":args.follow[2 * i + 1]})
+
 if args.inspect:
 	danger = 0
 	for i in args.inspect:
