@@ -152,6 +152,7 @@ if args.inspect:
 				print(i["notification"])
 		if not danger:
 			print("安全")
+		time.sleep(5)
 else:
 	send_enter_pack()
 	#发个进房包
